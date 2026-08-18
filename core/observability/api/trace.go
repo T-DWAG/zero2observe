@@ -64,7 +64,7 @@ func (s *Server) handleListTraces(w http.ResponseWriter, r *http.Request) {
 
 	items, total, err := s.store.ListTraces(r.Context(), filter)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -95,17 +95,17 @@ func (s *Server) handleListTraces(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetTrace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.New("missing trace id"))
+		writeError(w, http.StatusBadRequest, "missing trace id")
 		return
 	}
 
 	tr, err := s.store.GetTrace(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeError(w, http.StatusNotFound, errors.New("trace not found"))
+			writeError(w, http.StatusNotFound, "trace not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, toTraceDTO(tr))
@@ -114,23 +114,23 @@ func (s *Server) handleGetTrace(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetTraceSpans(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.New("missing trace id"))
+		writeError(w, http.StatusBadRequest, "missing trace id")
 		return
 	}
 
 	// 先确认 Trace 存在，避免「空 spans」和「不存在」混淆
 	if _, err := s.store.GetTrace(r.Context(), id); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			writeError(w, http.StatusNotFound, errors.New("trace not found"))
+			writeError(w, http.StatusNotFound, "trace not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	spans, err := s.store.GetTraceSpans(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 

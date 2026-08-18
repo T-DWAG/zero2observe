@@ -8,9 +8,10 @@ import (
 )
 
 type MemoryStorage struct {
-	mu     sync.RWMutex
-	Traces []*model.Trace
-	Spans  []*model.Span
+	mu          sync.RWMutex
+	Traces      []*model.Trace
+	Spans       []*model.Span
+	Evaluations []*model.Evaluation
 }
 
 func NewMemoryStorage() *MemoryStorage {
@@ -89,4 +90,26 @@ func (m *MemoryStorage) ListTraces(_ context.Context, filter TraceFilter) ([]*mo
 		end = len(matched)
 	}
 	return matched[start:end], total, nil
+}
+
+func (m *MemoryStorage) SaveEvaluation(_ context.Context, eval *model.Evaluation) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	cp := *eval
+	m.Evaluations = append(m.Evaluations, &cp)
+	return nil
+}
+
+func (m *MemoryStorage) ListEvaluations(_ context.Context, traceID string) ([]*model.Evaluation, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]*model.Evaluation, 0)
+	for _, eval := range m.Evaluations {
+		if eval.TraceID == traceID {
+			cp := *eval
+			out = append(out, &cp)
+		}
+	}
+	return out, nil
 }
