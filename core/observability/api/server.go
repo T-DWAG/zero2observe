@@ -4,12 +4,14 @@ import (
 	"net/http"
 
 	"github.com/T-DWAG/zero2observe/evaluation"
+	"github.com/T-DWAG/zero2observe/metrics"
 	"github.com/T-DWAG/zero2observe/storage"
 )
 
 type Server struct {
 	store storage.Storage
 	judge *evaluation.Judge // 可为 nil：未配置则 POST 返回 503
+	agg   *metrics.Aggregator
 }
 
 func NewServer(store storage.Storage) *Server {
@@ -18,6 +20,11 @@ func NewServer(store storage.Storage) *Server {
 
 func (s *Server) WithJudge(judge *evaluation.Judge) *Server {
 	s.judge = judge
+	return s
+}
+
+func (s *Server) WithAggregator(a *metrics.Aggregator) *Server {
+	s.agg = a
 	return s
 }
 
@@ -32,6 +39,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/evaluations", s.handleCreateEvaluation)
 	mux.HandleFunc("GET /api/v1/evaluations/{trace_id}", s.handleListEvaluations)
 
+	//metrics
+	mux.HandleFunc("GET /api/v1/metrics", s.handleGetMetrics)
 	return mux
 }
 

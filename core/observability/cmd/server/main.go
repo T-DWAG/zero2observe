@@ -4,9 +4,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/T-DWAG/zero2observe/api"
 	"github.com/T-DWAG/zero2observe/evaluation"
+	"github.com/T-DWAG/zero2observe/metrics"
 	"github.com/T-DWAG/zero2observe/model"
 	"github.com/T-DWAG/zero2observe/storage"
 )
@@ -16,7 +18,8 @@ func main() {
 
 	store := mustStore()
 	judge := evaluation.NewJudge(store, &evaluation.FakeCompleter{})
-	srv := api.NewServer(store).WithJudge(judge)
+	agg := metrics.NewAggregator(store, 30*time.Second)
+	srv := api.NewServer(store).WithJudge(judge).WithAggregator(agg)
 
 	log.Printf("listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, srv.Handler()))
