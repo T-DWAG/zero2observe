@@ -21,6 +21,16 @@ func withState(ctx context.Context, s *State) context.Context {
 type Config struct {
 	SessionID string // 本次会话的唯一标识
 	UserInput string // 当前用户输入内容
+
+	// TenantID 预留（专题2 落库）；专题0 不写表，可空。
+	TenantID string
+
+	// NoContent: true → 落盘前清空正文类字段。
+	// 零值 false = 落盘正文（兼容旧调用，不要用 CaptureContent 这种「零值即关闭」的布尔名）。
+	NoContent bool
+
+	// Redact: true → 落盘前对正文打码。NoContent=true 时无意义。
+	Redact bool
 }
 
 // WithObsCallback 准备一次 Agent 执行的采集上下文和回调处理。
@@ -34,7 +44,9 @@ func WithObsCallback(
 	cfg Config,
 ) (context.Context, callbacks.Handler, func(context.Context, string, error)) {
 	// 创建一个采集状态 State（一个 Trace 实例），绑定业务信息
-	state := newState(store, cfg.SessionID, cfg.UserInput)
+	// state := newState(store, cfg.SessionID, cfg.UserInput)
+	state := newState(store, cfg)
+
 	// 创建独立的 context 和取消函数，驱动后台采集 worker
 	workerCtx, cancel := context.WithCancel(context.Background())
 	go state.runWorker(workerCtx)

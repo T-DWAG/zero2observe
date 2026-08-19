@@ -19,6 +19,9 @@ type State struct {
 	// 存储接口，用于持久化 Trace 数据
 	storage storage.Storage
 
+	cfg   Config
+	stats *Stats
+
 	// 当前 Trace
 	Trace *model.Trace
 	// spanStack 维护当前活跃的 span ID（栈结构）
@@ -34,14 +37,17 @@ type State struct {
 	done chan struct{}
 }
 
-func newState(store storage.Storage, sessionID, userInput string) *State {
+func newState(store storage.Storage, cfg Config) *State {
 	now := time.Now()
 	return &State{
 		storage: store,
+		cfg:     cfg,
+		stats:   &Stats{},
+
 		Trace: &model.Trace{
 			TraceID:   uuid.New().String(),
-			SessionID: sessionID,
-			UserInput: userInput,
+			SessionID: cfg.SessionID,
+			UserInput: cfg.UserInput,
 			StartTime: now,
 			Status:    model.SpanStatusPending,
 		},
@@ -62,16 +68,12 @@ func (s *State) runWorker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			if err := s.storage.SaveSpan(ctx, span); err != nil {
-				log.Printf("failed to save span: %v", err)
-			}
+			s.saveSpanWithRetry(ctx, span)
 		case trace, ok := <-s.traceCh:
 			if !ok {
 				return
 			}
-			if err := s.storage.SaveTrace(ctx, trace); err != nil {
-				log.Printf("failed to save trace: %v", err)
-			}
+			s.saveTraceWithRetry(ctx, trace)
 		}
 
 	}
@@ -124,6 +126,9 @@ func (s *State) finishSpan(spanID string, mutate func(*model.Span)) {
 	delete(s.pending, spanID)
 	s.popSpan()
 	s.Trace.SpanCount++
+
+	applyContentPolicy(s.cfg, nil, span) // 落盘前对正文打码
+
 	select {
 	case s.spanCh <- span:
 	default:
@@ -162,6 +167,9 @@ func (s *State) finishTrace(output string, runErr error) {
 	s.Trace.DurationMs = s.Trace.EndTime.Sub(s.Trace.StartTime).Milliseconds()
 	// 保存 Agent 执行的输出内容
 	s.Trace.AgentOutput = output
+
+	applyContentPolicy(s.cfg, s.Trace, nil) // 落盘前对正文打码
+
 	// 判断是否有错误，根据情况设置 Trace 状态
 	if runErr != nil {
 		s.Trace.Status = model.SpanStatusError
@@ -171,6 +179,7 @@ func (s *State) finishTrace(output string, runErr error) {
 	// 关闭 spanCh，表示之后不会再写 Span 进来
 	close(s.spanCh)
 	// 非阻塞地尝试把 Trace 写入 traceCh，如果满了就丢弃并日志告警
+
 	select {
 	case s.traceCh <- s.Trace:
 	default:
@@ -186,4 +195,32 @@ func toJSON(v any) string {
 		return ""
 	}
 	return string(b)
+}
+
+const saveMaxAttempts = 3
+
+func (s *State) saveSpanWithRetry(ctx context.Context, span *model.Span) {
+	var err error
+	for i := 0; i < saveMaxAttempts; i++ {
+		err = s.storage.SaveSpan(ctx, span)
+		if err == nil {
+			s.stats.SaveSpanOK.Add(1)
+			return
+		}
+	}
+	s.stats.SaveSpanFails.Add(1)
+	log.Printf("[obs] save span failed after %d attempts: %v", saveMaxAttempts, err)
+}
+
+func (s *State) saveTraceWithRetry(ctx context.Context, trace *model.Trace) {
+	var err error
+	for i := 0; i < saveMaxAttempts; i++ {
+		err = s.storage.SaveTrace(ctx, trace)
+		if err == nil {
+			s.stats.SaveTraceOK.Add(1)
+			return
+		}
+	}
+	s.stats.SaveTraceFails.Add(1)
+	log.Printf("[obs] save trace failed after %d attempts: %v", saveMaxAttempts, err)
 }
