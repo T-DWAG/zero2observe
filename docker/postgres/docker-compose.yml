@@ -1,0 +1,25 @@
+# 本地 PostgreSQL · Step 3+ 联调 / 集成测试
+# 用法：在本目录执行  docker compose up -d
+services:
+  postgres:
+    build: .
+    image: obs-postgres:16
+    container_name: obs-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: obs_dev
+      POSTGRES_DB: observability
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    volumes:
+      - obs_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d observability"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  obs_pg_data:
