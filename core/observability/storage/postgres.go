@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/T-DWAG/zero2observe/model"
 	"gorm.io/driver/postgres"
@@ -20,6 +21,17 @@ type PostgresStorage struct {
 // 调用方负责：Open → model.AutoMigrate → NewPostgresStorage。
 func NewPostgresStorage(db *gorm.DB) *PostgresStorage {
 	return &PostgresStorage{db: db}
+}
+
+// DefaultPostgresDSN 与仓库 docker/postgres 默认账密一致。
+const DefaultPostgresDSN = "host=127.0.0.1 user=postgres password=obs_dev dbname=observability port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+
+// PostgresDSN 优先读 OBS_PG_DSN，否则用 DefaultPostgresDSN。
+func PostgresDSN() string {
+	if dsn := os.Getenv("OBS_PG_DSN"); dsn != "" {
+		return dsn
+	}
+	return DefaultPostgresDSN
 }
 
 // OpenPostgres 打开连接；dsn 示例见手敲清单第三节。

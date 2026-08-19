@@ -27,3 +27,5 @@ func (f *FakeCompleter) Complete(ctx context.Context, systemPrompt string, userP
 			"efficiency": {"score": 0.7, "reason": "token 消耗可接受"}
 		  }`, nil
 }
+
+

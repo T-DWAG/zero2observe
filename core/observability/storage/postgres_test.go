@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -11,12 +10,7 @@ import (
 )
 
 func TestPostgresStorage_SaveAndGet(t *testing.T) {
-	dsn := os.Getenv("OBS_PG_DSN")
-	if dsn == "" {
-		t.Skip("set OBS_PG_DSN to run postgres integration test")
-	}
-
-	db, err := OpenPostgres(dsn)
+	db, err := OpenPostgres(PostgresDSN())
 	if err != nil {
 		t.Fatal(err)
 	}
